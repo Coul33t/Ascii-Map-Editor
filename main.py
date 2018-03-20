@@ -8,7 +8,7 @@ from bearlibterminal import terminal as blt
 import pdb
 
 CONSOLE_SIZE = {'x': 80, 'y': 25}
-MAP_CONSOLE = {'x': 2, 'y': 2, 'w': 57, 'h': 21}
+MAP_CONSOLE = {'x': 2, 'y': 2, 'w': 57, 'h': 20}
 TILES = {'wall': '#', 'floor': '.', 'door': '+'}
 
 class Tile(object):
@@ -163,7 +163,15 @@ def render(game_map):
     blt.color("white")
     # Right panel display
     # Cursor position
-    blt.puts(61, 2, f"Cursor: [color=orange]{blt.state(blt.TK_MOUSE_X)-2}:{blt.state(blt.TK_MOUSE_Y)-2}[/color]")
+    x = blt.state(blt.TK_MOUSE_X)-2
+    if x > MAP_CONSOLE['w'] - 1:
+        x = MAP_CONSOLE['w']
+    
+    y = blt.state(blt.TK_MOUSE_Y)-2
+    if y > MAP_CONSOLE['h'] - 1:
+        y = MAP_CONSOLE['h']
+
+    blt.puts(61, 2, f"Cursor: [color=orange]{x}:{y}[/color]")
 
     for y,(key, val) in enumerate(TILES.items()):
         blt.put(61, y+3, 0x25CB)
