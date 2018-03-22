@@ -1,8 +1,7 @@
 # coding=utf-8
+import os
+import json
 
-from __future__ import division
-
-from collections import namedtuple
 from bearlibterminal import terminal as blt
 
 import pdb
@@ -16,7 +15,8 @@ class Tile(object):
         self.char = char
 
 class Map(object):
-    def __init__(self, w=20, h=20):
+    def __init__(self, w=20, h=20, name=None):
+        self.name = name
         self.w = w
         self.h = h
         self.map_tiles = [[Tile() for y in range(h)] for x in range(w)]
@@ -24,9 +24,14 @@ class Map(object):
     def get_tile(self, x, y):
         if x < len(self.map_tiles) and y < len(self.map_tiles[0]):
             return self.map_tiles[x][y]
+
+    def get_map_as_ascii(self):
+        return [[t.char for t in row] for row in self.map_tiles]
+
+    def export(self, filename='map'):
+        with open (filename + '.json', 'w') as o_f:
+            json.dump([self.name, self.w, self.h, self.get_map_as_ascii()], o_f)
         
-
-
 class Rect(object):
     def __init__(self, x, y, width, height):
         self.x = x
@@ -37,15 +42,12 @@ class Rect(object):
     def __contains__(self, pos):
         x,y = pos
         return self.x <= x <= self.x + self.width and \
-               self.y <= y <= self.y + self.height
+               self.y <= y <= s+elf.y + self.height
 
     def fill(self, c = 0x2588):
         for i in range(self.x, self.x + self.width + 1):
             for j in range(self.y, self.y + self.height + 1):
                 blt.put(i, j, c)
-
-
-double_click_area = Rect(1, 11, 17, 4)
 
 def test_mouse():
     blt.set("window.title='Omni: mouse input'")
@@ -63,21 +65,24 @@ def test_mouse():
 
     character = 'wall'
 
+    menu_open = None
+
     # Flush input
     while blt.has_input():
         blt.read()
 
     proceed = True
 
+    # Every tick (can repeat)
     while proceed:
-
+        
         blt.clear()
 
-        render(game_map)
+        render(game_map, menu_open)
 
         blt.color("white")
 
-        if blt.state(blt.TK_MOUSE_LEFT) and is_in_map_console():
+        if blt.state(blt.TK_MOUSE_LEFT) and is_in_map_console() and not menu_open:
             x = blt.state(blt.TK_MOUSE_X)-2
             y = blt.state(blt.TK_MOUSE_Y)-2
             if x >= 0 and x < game_map.w and y >= 0 and y < game_map.h:
@@ -87,6 +92,7 @@ def test_mouse():
 
         blt.refresh()
 
+        # Only once (no repeat)
         while True:
             code = blt.read()
 
@@ -97,17 +103,22 @@ def test_mouse():
                 x = blt.state(blt.TK_MOUSE_X)
                 y = blt.state(blt.TK_MOUSE_Y)
 
-                if x > 60 and 3 <= y <= 3 + len(TILES.keys()):
-                    character = list(TILES.keys())[y-3]
+                if x > 60 and 4 <= y <= 4 + len(TILES.keys()):
+                    character = list(TILES.keys())[y-4]
+
+                if y == 0 and 2 <= x <= 6:
+                    game_map.export()
+
+                if y == 0 and 14 <= x <= 20:
+                    menu_open = 'Font'
                 
                 
 
             elif code == blt.TK_MOUSE_RIGHT:
-                mrx = blt.state(blt.TK_MOUSE_X)
-                mry = blt.state(blt.TK_MOUSE_Y)
+                pass
 
             elif code == blt.TK_MOUSE_SCROLL:
-                scroll += blt.state(blt.TK_MOUSE_WHEEL)
+                pass
 
             elif code == blt.TK_SPACE:
                 cursor_visible = not cursor_visible
@@ -129,12 +140,13 @@ def is_in_map_console():
         return True
 
 
-def render(game_map):
+def render(game_map, menu_open):
     blt.color("orange")
     # first render the top bar
     blt.puts(2, 0, "Save")
     blt.puts(8, 0, "Load")
-    blt.puts(14, 0, "Exit")
+    blt.puts(14, 0, "Font")
+    blt.puts(20, 0, "Exit")
 
     blt.puts(61, 0, "ASCII Editor")
 
@@ -161,25 +173,77 @@ def render(game_map):
     blt.puts(2, CONSOLE_SIZE['y']-1, "▓")
 
     blt.color("white")
+
     # Right panel display
+
     # Cursor position
     x = blt.state(blt.TK_MOUSE_X)-2
     if x > MAP_CONSOLE['w'] - 1:
         x = MAP_CONSOLE['w']
+
+    if x < 0:
+        x = 0
     
     y = blt.state(blt.TK_MOUSE_Y)-2
     if y > MAP_CONSOLE['h'] - 1:
         y = MAP_CONSOLE['h']
 
+    if y < 0:
+        y = 0
+
     blt.puts(61, 2, f"Cursor: [color=orange]{x}:{y}[/color]")
 
+    blt.puts(61, 3, f"Map size: [color=orange]{game_map.w}x{game_map.h}[/color]")
+
     for y,(key, val) in enumerate(TILES.items()):
-        blt.put(61, y+3, 0x25CB)
-        blt.puts(63, y+3, f"{key}")
+        blt.put(61, y+4, 0x25CB)
+        blt.puts(63, y+4, f"{key}")
 
     for x in range(game_map.w):
         for y in  range(game_map.h):
             blt.puts(x+2, y+2, game_map.get_tile(x, y).char)
+
+    if menu_open:
+        if menu_open == 'Font':
+            
+            fonts_names = os.listdir('fonts/')
+            total_h = len(fonts_names)
+            max_w = -1
+
+            # Once to clear the area (lel)
+            for y,font in enumerate(os.listdir('fonts/')):
+                
+                name = ' '.join(font.split('_')[:-1])
+                size_x = font.split('_')[-1].split('x')[0]
+                size_y = font.split('_')[-1].split('x')[1][:-4]
+
+                if max_w < len(name + ' (' + size_x + 'x' + size_y + ')'):
+                    max_w = len(name + ' (' + size_x + 'x' + size_y + ')')
+
+            blt.clear_area(13, 1, max_w + 2, total_h)
+
+            for y,font in enumerate(os.listdir('fonts/')):
+                
+                name = ' '.join(font.split('_')[:-1])
+                size_x = font.split('_')[-1].split('x')[0]
+                size_y = font.split('_')[-1].split('x')[1][:-4]
+                blt.puts(14, y+1, f'{name} ({size_x}x{size_y})')
+
+            blt.color("orange")
+            
+            for y in range(2, 2 + total_h - 1):
+                #TODO: add a thing character
+                blt.puts(13, y, "║")
+                blt.puts(13 + max_w + 1, y, "║")
+
+            for x in range(14, 14 + max_w):
+                blt.puts(x, total_h + 1, "═")
+
+            blt.puts(13, 1, "╗")
+            blt.puts(14 + max_w, 1, "╔")
+            blt.puts(13, total_h + 1, "╚")
+            blt.puts(14 + max_w, total_h + 1, "╝")
+
 
 if __name__ == "__main__":
     blt.open()
